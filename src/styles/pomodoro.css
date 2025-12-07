@@ -220,6 +220,15 @@ a {
   border-color: var(--google-yellow);
 }
 
+.btn-primary:disabled,
+.btn-secondary:disabled,
+.btn-ghost:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+  border-color: var(--border-color);
+}
+
 /* Lesson Guide */
 .lesson-notes .lesson-list {
   color: var(--text-main);

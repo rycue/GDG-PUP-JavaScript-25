@@ -1,11 +1,85 @@
-import {
-  createPomodoroState,
-  switchMode,
-  tickTimer,
-  getDurationForMode,
-  formatTime,
-} from './core/timer.js';
-import { updateModeButtons } from './ui/render.js';
+// Centralized timer durations (seconds) for each mode.
+export const DURATIONS = {
+  focus: 25 * 60,
+  'short-break': 5 * 60,
+  'long-break': 15 * 60,
+};
+
+// ===== Core timer helpers =====
+export function createPomodoroState() {
+  return {
+    mode: 'focus',
+    remainingSeconds: DURATIONS.focus,
+    completedPomodoros: 0,
+    isRunning: false,
+    tasks: [],
+  };
+}
+
+export function getDurationForMode(mode) {
+  return DURATIONS[mode] || DURATIONS.focus;
+}
+
+export function switchMode(state, mode) {
+  const nextDuration = getDurationForMode(mode);
+  return {
+    ...state,
+    mode,
+    remainingSeconds: nextDuration,
+    isRunning: false,
+  };
+}
+
+export function tickTimer(state) {
+  if (state.remainingSeconds > 1) {
+    return {
+      nextState: { ...state, remainingSeconds: state.remainingSeconds - 1 },
+      completedCycle: false,
+    };
+  }
+
+  let completedPomodoros = state.completedPomodoros;
+  let nextMode;
+
+  if (state.mode === 'focus') {
+    completedPomodoros += 1;
+    nextMode = completedPomodoros % 4 === 0 ? 'long-break' : 'short-break';
+  } else {
+    nextMode = 'focus';
+  }
+
+  const nextDuration = getDurationForMode(nextMode);
+
+  return {
+    nextState: {
+      ...state,
+      mode: nextMode,
+      remainingSeconds: nextDuration,
+      completedPomodoros,
+      isRunning: false,
+    },
+    completedCycle: true,
+  };
+}
+
+export function formatTime(totalSeconds) {
+  const minutes = Math.floor(totalSeconds / 60)
+    .toString()
+    .padStart(2, '0');
+  const seconds = (totalSeconds % 60).toString().padStart(2, '0');
+  return `${minutes}:${seconds}`;
+}
+
+// ===== UI helpers =====
+export function updateModeButtons(modeButtons, activeMode) {
+  for (const button of modeButtons) {
+    if (button.dataset.mode === activeMode) {
+      button.classList.add('active');
+    } else {
+      button.classList.remove('active');
+    }
+  }
+}
 
 /**
  * Initializes the Pomodoro application by setting up the UI, state, and event listeners.
@@ -35,13 +109,7 @@ export function initializePomodoroApp(
   const iterationCount = doc.getElementById('iteration-count');
 
   // Ensure all critical UI components are present before proceeding.
-  if (
-    !timerDisplay ||
-    !startButton ||
-    !pauseButton ||
-    !resetButton ||
-    !iterationCount
-  ) {
+  if (!timerDisplay || !startButton || !pauseButton || !resetButton) {
     console.error('A critical UI element is missing from the DOM.');
     return;
   }
@@ -72,13 +140,24 @@ export function initializePomodoroApp(
    */
   function render() {
     timerDisplay.textContent = formatTime(state.remainingSeconds);
-    iterationCount.textContent = `${state.completedPomodoros}`;
+    if (iterationCount) {
+      iterationCount.textContent = `${state.completedPomodoros}`;
+    }
     // Update the visual state of mode selection buttons.
     updateModeButtons(modeButtons, state.mode);
+    updateControls();
   }
   // ========= END Live Coding =========
 
   // ========= START Live Coding: Timer Controls (Start/Pause/Reset) =========
+  /**
+   * Keeps control buttons in sync with running/paused state for quick visual feedback.
+   */
+  function updateControls() {
+    startButton.disabled = state.isRunning;
+    pauseButton.disabled = !state.isRunning;
+  }
+
   /**
    * Starts the timer loop.
    * If the timer is not already running, it sets up a `setInterval` to tick
@@ -90,6 +169,7 @@ export function initializePomodoroApp(
       return; // Prevent multiple intervals from running simultaneously.
     }
     state = { ...state, isRunning: true };
+    render(); // Immediate UI feedback.
     intervalId = setInterval(() => {
       const { nextState, completedCycle } = tickTimer(state);
       state = nextState;
@@ -98,6 +178,7 @@ export function initializePomodoroApp(
       // Stop the timer if the session (e.g., focus, break) has ended.
       if (completedCycle) {
         stopTimer();
+        render(); // Refresh controls after stopping.
       }
     }, 1000);
   }
@@ -157,5 +238,10 @@ if (globalThis.window !== undefined) {
   globalThis.PomodoroApp = {
     initializePomodoroApp,
   };
-  globalThis.addEventListener('DOMContentLoaded', () => initializePomodoroApp());
+  if (document.readyState === 'loading') {
+    globalThis.addEventListener('DOMContentLoaded', () => initializePomodoroApp());
+  } else {
+    // If the script loads after DOMContentLoaded, initialize immediately.
+    initializePomodoroApp();
+  }
 }
