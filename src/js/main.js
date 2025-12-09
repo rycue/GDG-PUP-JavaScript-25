@@ -1,247 +1,286 @@
-// Centralized timer durations (seconds) for each mode.
-export const DURATIONS = {
-  focus: 25 * 60,
-  'short-break': 5 * 60,
-  'long-break': 15 * 60,
+/**
+ * GDG Pomodoro Timer
+ * A simple, beginner-friendly JavaScript application for managing focus sessions.
+ * 
+ * Concepts covered:
+ * - Variables & Constants
+ * - DOM Manipulation (finding & changing elements)
+ * - Event Listeners (clicks, inputs)
+ * - Functions & Logic
+ * - setInterval for timing
+ */
+
+// ==========================================
+// 1. CONFIGURATION & STATE
+// Variables that store data for our app
+// ==========================================
+
+const DURATIONS = {
+  focus: 25 * 60,         // 25 minutes in seconds
+  "short-break": 5 * 60,  // 5 minutes
+  "long-break": 15 * 60,  // 15 minutes
 };
 
-// ===== Core timer helpers =====
-export function createPomodoroState() {
-  return {
-    mode: 'focus',
-    remainingSeconds: DURATIONS.focus,
-    completedPomodoros: 0,
-    isRunning: false,
-    tasks: [],
-  };
-}
+const THEMES = {
+  focus: "var(--google-blue)",
+  "short-break": "var(--google-green)",
+  "long-break": "var(--google-yellow)",
+};
 
-export function getDurationForMode(mode) {
-  return DURATIONS[mode] || DURATIONS.focus;
-}
+// Application State (The "memory" of our app)
+let state = {
+  mode: "focus",           // Current mode: 'focus', 'short-break', or 'long-break'
+  timeLeft: DURATIONS.focus, // Time remaining in seconds
+  isRunning: false,        // Is the timer currently counting down?
+  timerInterval: null,     // Holds the ID of our active interval (so we can stop it)
+  // tasks: [],            // Array to store our list of tasks (Commented out for workshop simplicity)
+};
 
-export function switchMode(state, mode) {
-  const nextDuration = getDurationForMode(mode);
-  return {
-    ...state,
-    mode,
-    remainingSeconds: nextDuration,
-    isRunning: false,
-  };
-}
+// ==========================================
+// 2. DOM ELEMENTS
+// We select elements from the HTML page so we can control them
+// ==========================================
 
-export function tickTimer(state) {
-  if (state.remainingSeconds > 1) {
-    return {
-      nextState: { ...state, remainingSeconds: state.remainingSeconds - 1 },
-      completedCycle: false,
-    };
-  }
+const elements = {
+  // Timer Display
+  timerDisplay: document.getElementById("timer-display"),
+  timerLabel: document.getElementById("timer-label"),
+  ringProgress: document.getElementById("ring-progress"),
+  
+  // Buttons & Controls
+  toggleBtn: document.getElementById("toggle-btn"),
+  toggleIcon: document.getElementById("toggle-icon"),
+  resetBtn: document.getElementById("reset-btn"),
+  modeButtons: document.querySelectorAll("[data-mode]"),
+  
+  modeButtons: document.querySelectorAll("[data-mode]"),
+  
+  /* 
+  // Tasks (Commented out)
+  taskList: document.getElementById("task-list"),
+  taskInput: document.getElementById("new-task-title"),
+  addTaskBtn: document.getElementById("add-task-btn"),
+  taskCount: document.getElementById("task-count-num"), 
+  */
+};
 
-  let completedPomodoros = state.completedPomodoros;
-  let nextMode;
+// ==========================================
+// 3. CORE FUNCTIONS 
+// The logic that makes the app work
+// ==========================================
 
-  if (state.mode === 'focus') {
-    completedPomodoros += 1;
-    nextMode = completedPomodoros % 4 === 0 ? 'long-break' : 'short-break';
-  } else {
-    nextMode = 'focus';
-  }
+/**
+ * Updates the screen to show the current state.
+ * This is called whenever data changes.
+ */
+function updateUI() {
+  // 1. Update the time display (e.g., "25:00")
+  const minutes = Math.floor(state.timeLeft / 60);
+  const seconds = state.timeLeft % 60;
+  // PadStart ensures we see "05" instead of just "5"
+  elements.timerDisplay.textContent = `${minutes}:${seconds.toString().padStart(2, "0")}`;
+  
+  // 2. Update the progress ring circle
+  const totalTime = DURATIONS[state.mode];
+  const progress = 1 - (state.timeLeft / totalTime);
+  elements.ringProgress.style.strokeDashoffset = progress; // logic in CSS handles the drawing
 
-  const nextDuration = getDurationForMode(nextMode);
+  // 3. Update the play/pause icon
+  elements.toggleIcon.textContent = state.isRunning ? "pause" : "play_arrow";
 
-  return {
-    nextState: {
-      ...state,
-      mode: nextMode,
-      remainingSeconds: nextDuration,
-      completedPomodoros,
-      isRunning: false,
-    },
-    completedCycle: true,
-  };
-}
-
-export function formatTime(totalSeconds) {
-  const minutes = Math.floor(totalSeconds / 60)
-    .toString()
-    .padStart(2, '0');
-  const seconds = (totalSeconds % 60).toString().padStart(2, '0');
-  return `${minutes}:${seconds}`;
-}
-
-// ===== UI helpers =====
-export function updateModeButtons(modeButtons, activeMode) {
-  for (const button of modeButtons) {
-    if (button.dataset.mode === activeMode) {
-      button.classList.add('active');
+  // 4. Highlight the correct mode button
+  elements.modeButtons.forEach(btn => {
+    const btnMode = btn.dataset.mode;
+    if (btnMode === state.mode) {
+      btn.classList.add("active");
     } else {
-      button.classList.remove('active');
+      btn.classList.remove("active");
     }
+  });
+
+  /* 
+  // 5. Update Task Counts (Commented out)
+  const completedTasks = state.tasks.filter(t => t.isDone).length;
+  elements.taskCount.textContent = completedTasks;
+  */
+
+  // 6. Update Color Theme
+  const root = document.documentElement;
+  root.style.setProperty("--theme-primary", THEMES[state.mode]);
+  
+  // 6. Update Timer Label
+  if (state.mode === 'focus') {
+    elements.timerLabel.textContent = state.isRunning ? "Go go go!" : "Ready to focus?";
+  } else {
+    elements.timerLabel.textContent = "Take a breather";
   }
 }
 
 /**
- * Initializes the Pomodoro application by setting up the UI, state, and event listeners.
- * This function orchestrates the entire application, from DOM element selection to
- * timer management and task handling. It is designed to be self-contained and
- * can be safely run in both browser and server-side environments for testing.
- *
- * @param {Document} [doc=globalThis.document] - The document object to interact with,
- * allowing for dependency injection in non-browser environments.
+ * Switches the timer mode (Focus, Short Break, Long Break)
  */
-export function initializePomodoroApp(
-  doc = globalThis.document === undefined ? null : globalThis.document
-) {
-  // Abort initialization if the document or its core methods are unavailable.
-  if (!doc?.getElementById) {
-    return;
+function switchMode(newMode) {
+  state.mode = newMode;
+  state.timeLeft = DURATIONS[newMode];
+  state.isRunning = false;
+  
+  // Stop the timer if it was running
+  if (state.timerInterval) {
+    clearInterval(state.timerInterval);
+    state.timerInterval = null;
   }
+  
+  updateUI();
+}
 
-  // --- DOM Element Selection ---
-  // Retrieve all necessary DOM elements for the application to function.
-  // If any critical element is missing, the function will exit early.
-  const timerDisplay = doc.getElementById('timer-display');
-  const modeButtons = doc.querySelectorAll('[data-mode]');
-  const startButton = doc.getElementById('start-btn');
-  const pauseButton = doc.getElementById('pause-btn');
-  const resetButton = doc.getElementById('reset-btn');
-  const iterationCount = doc.getElementById('iteration-count');
-
-  // Ensure all critical UI components are present before proceeding.
-  if (!timerDisplay || !startButton || !pauseButton || !resetButton) {
-    console.error('A critical UI element is missing from the DOM.');
-    return;
-  }
-
-  // --- State and Interval Management ---
-  let state = createPomodoroState();
-  let intervalId = null;
-
-  /**
-   * Stops the main timer interval, preventing further ticks.
-   * This function clears the active interval and updates the state to reflect
-   * that the timer is no longer running.
-   */
-  function stopTimer() {
-    if (intervalId) {
-      clearInterval(intervalId);
-      intervalId = null;
-    }
-    state = { ...state, isRunning: false };
-  }
-
-  // ========= START Live Coding: Render Pipeline =========
-  /**
-   * Main render pipeline.
-   * This function synchronizes the entire UI with the current application state.
-   * It updates the timer display, pomodoro completion count, and task list.
-   * It also ensures that UI elements like mode buttons reflect the current state.
-   */
-  function render() {
-    timerDisplay.textContent = formatTime(state.remainingSeconds);
-    if (iterationCount) {
-      iterationCount.textContent = `${state.completedPomodoros}`;
-    }
-    // Update the visual state of mode selection buttons.
-    updateModeButtons(modeButtons, state.mode);
-    updateControls();
-  }
-  // ========= END Live Coding =========
-
-  // ========= START Live Coding: Timer Controls (Start/Pause/Reset) =========
-  /**
-   * Keeps control buttons in sync with running/paused state for quick visual feedback.
-   */
-  function updateControls() {
-    startButton.disabled = state.isRunning;
-    pauseButton.disabled = !state.isRunning;
-  }
-
-  /**
-   * Starts the timer loop.
-   * If the timer is not already running, it sets up a `setInterval` to tick
-   * every second. On each tick, it updates the state and re-renders the UI.
-   * If a pomodoro cycle completes, it automatically stops the timer.
-   */
-  function startTimer() {
-    if (intervalId) {
-      return; // Prevent multiple intervals from running simultaneously.
-    }
-    state = { ...state, isRunning: true };
-    render(); // Immediate UI feedback.
-    intervalId = setInterval(() => {
-      const { nextState, completedCycle } = tickTimer(state);
-      state = nextState;
-      render(); // Update UI every second.
-
-      // Stop the timer if the session (e.g., focus, break) has ended.
-      if (completedCycle) {
-        stopTimer();
-        render(); // Refresh controls after stopping.
+/**
+ * Starts or Pauses the timer
+ */
+function toggleTimer() {
+  // If running, stop it
+  if (state.isRunning) {
+    state.isRunning = false;
+    clearInterval(state.timerInterval);
+    state.timerInterval = null;
+  } 
+  // If stopped, start it
+  else {
+    state.isRunning = true;
+    
+    // Create an interval that runs every 1 second (1000ms)
+    state.timerInterval = setInterval(() => {
+      if (state.timeLeft > 0) {
+        state.timeLeft--;
+        updateUI();
+      } else {
+        // Time is up!
+        alert("Time is up!");
+        state.isRunning = false;
+        clearInterval(state.timerInterval);
+        switchMode(state.mode === 'focus' ? 'short-break' : 'focus'); // Simple auto-switch
       }
     }, 1000);
   }
-
-  /**
-   * Pauses the timer by stopping the interval.
-   */
-  function pauseTimer() {
-    stopTimer();
-    render(); // Ensure UI reflects the paused state.
-  }
-
-  /**
-   * Resets the timer to the initial state for the 'focus' mode.
-   * It stops any active timer and restores the default duration.
-   */
-  function resetTimer() {
-    stopTimer();
-    state = switchMode(
-      { ...state, remainingSeconds: getDurationForMode('focus') },
-      'focus'
-    );
-    render();
-  }
-
-  // --- Event Listener Attachments ---
-
-  // Attach core timer controls.
-  startButton.addEventListener('click', startTimer);
-  pauseButton.addEventListener('click', pauseTimer);
-  resetButton.addEventListener('click', resetTimer);
-  // ========= END Live Coding =========
-
-  // ========= START Live Coding: Mode Switching Events =========
-  // Attach listeners for mode-switching buttons (Focus, Short Break, Long Break).
-  for (const button of modeButtons) {
-    button.addEventListener('click', () => {
-      stopTimer();
-      const newMode = button.dataset.mode;
-      state = switchMode(state, newMode);
-      render();
-    });
-  }
-  // ========= END Live Coding =========
-
-  // --- Initial Render ---
-  // Perform an initial render to display the default state when the app loads.
-  render();
+  
+  updateUI();
 }
 
 /**
- * Expose the application initialization function to the global scope for browser environments.
- * This allows the application to be started from an inline script tag or developer console.
- * The application is automatically initialized once the DOM is fully loaded.
+ * Resets the current timer to the beginning
  */
-if (globalThis.window !== undefined) {
-  globalThis.PomodoroApp = {
-    initializePomodoroApp,
+function resetTimer() {
+  state.isRunning = false;
+  clearInterval(state.timerInterval);
+  state.timerInterval = null;
+  state.timeLeft = DURATIONS[state.mode];
+  updateUI();
+}
+
+/* 
+// ==========================================
+// 4. TASK MANAGEMENT
+// Handling the todo list (Commented out for simplified workshop)
+// ==========================================
+
+function addTask() {
+  const text = elements.taskInput.value.trim();
+  if (text === "") return; // Don't add empty tasks
+
+  const newTask = {
+    id: Date.now(), // simple unique ID
+    text: text,
+    isDone: false
   };
-  if (document.readyState === 'loading') {
-    globalThis.addEventListener('DOMContentLoaded', () => initializePomodoroApp());
-  } else {
-    // If the script loads after DOMContentLoaded, initialize immediately.
-    initializePomodoroApp();
+
+  state.tasks.push(newTask);
+  elements.taskInput.value = ""; // Clear input
+  renderTasks();
+  updateUI();
+}
+
+function toggleTask(id) {
+  // Find the task and flip its isDone status
+  const task = state.tasks.find(t => t.id === id);
+  if (task) {
+    task.isDone = !task.isDone;
+    renderTasks();
+    updateUI();
   }
 }
+
+function deleteTask(id) {
+  // Keep only tasks that do NOT match the ID
+  state.tasks = state.tasks.filter(t => t.id !== id);
+  renderTasks();
+  updateUI();
+}
+
+/**
+ * Renders the list of tasks into the HTML
+ */
+/**
+function renderTasks() {
+  elements.taskList.innerHTML = ""; // Clear current list
+
+  if (state.tasks.length === 0) {
+    elements.taskList.innerHTML = '<li class="empty-state">No active tasks</li>';
+    return;
+  }
+
+  state.tasks.forEach(task => {
+    // Create List Item
+    const li = document.createElement("li");
+    li.className = `task-item ${task.isDone ? "completed" : ""}`;
+    
+    // HTML for the task
+    li.innerHTML = `
+      <div class="task-content">
+        <button class="btn-check" onclick="window.app.toggleTask(${task.id})">
+          <span class="material-symbols-rounded">${task.isDone ? "check_circle" : "radio_button_unchecked"}</span>
+        </button>
+        <span class="task-title">${task.text}</span>
+      </div>
+      <button class="btn-delete" onclick="window.app.deleteTask(${task.id})">
+        <span class="material-symbols-rounded">delete</span>
+      </button>
+    `;
+
+    elements.taskList.appendChild(li);
+  });
+}
+*/
+
+// ==========================================
+// 5. INITIALIZATION & EVENTS
+// Connecting everything together
+// ==========================================
+
+// Add click events to buttons
+elements.toggleBtn.addEventListener("click", toggleTimer);
+elements.resetBtn.addEventListener("click", resetTimer);
+/* 
+// Task Event Listeners (Commented out)
+elements.addTaskBtn.addEventListener("click", addTask);
+elements.taskInput.addEventListener("keypress", (e) => {
+  if (e.key === "Enter") addTask();
+});
+*/
+
+// Mode switching buttons
+elements.modeButtons.forEach(btn => {
+  btn.addEventListener("click", () => {
+    switchMode(btn.dataset.mode);
+  });
+});
+
+/*
+// Expose functions to window (Commented out)
+window.app = {
+  toggleTask,
+  deleteTask
+};
+*/
+
+// Start the app!
+updateUI();
+// renderTasks(); // (Commented out)
