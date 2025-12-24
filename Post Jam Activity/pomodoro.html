@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+  <!-- HEAD -->
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -15,9 +16,9 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0"
     />
-
     <link rel="stylesheet" href="./styles/pomodoro.css" />
   </head>
+  <!-- BODY -->
   <body>
     <div class="gdg-decor-bg" aria-hidden="true">
       <span class="bracket">&lt;</span>
@@ -27,12 +28,12 @@
     <header class="page-header">
       <div class="logo-container">
         <span class="gdg-logo-text">
-          <span class="blue">G</span><span class="red">D</span
-          ><span class="yellow">G</span> <span class="green">Timer</span>
+          <span class="blue">G</span><span class="red">D</span>
+          <span class="yellow">G</span> <span class="green">Timer</span>
         </span>
       </div>
     </header>
-
+    
     <main class="layout">
       <section class="panel glass-effect">
         <header class="panel-header">
@@ -71,7 +72,6 @@
               cx="150"
               cy="150"
               r="135"
-              pathLength="1"
             ></circle>
           </svg>
           <div class="timer-display" id="timer-display">25:00</div>
@@ -128,14 +128,12 @@
             <button
               class="btn-icon-small"
               id="add-task-btn"
-              aria-label="Add Task"
-            >
+              aria-label="Add Task">
               <span class="material-symbols-rounded">add</span>
             </button>
           </div>
         </div>
         <!-- END: Task Management Section -->
-
       </section>
     </main>
 

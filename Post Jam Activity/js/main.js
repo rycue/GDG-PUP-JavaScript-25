@@ -2,46 +2,52 @@
 // 1. VARIABLES & CONFIGURATION
 // ==========================================
 
+const RING_RADIUS = 135;
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+
 // Time durations in seconds
-const FOCUS_TIME = 25 * 60;
+const FOCUS_TIME       = 25 * 60;
 const SHORT_BREAK_TIME = 5 * 60;
-const LONG_BREAK_TIME = 15 * 60;
+const LONG_BREAK_TIME  = 15 * 60;
 
 // Colors
-const COLOR_BLUE = "var(--google-blue)";
-const COLOR_GREEN = "var(--google-green)";
-const COLOR_YELLOW = "var(--google-yellow)";
+const COLOR_BLUE       = "var(--google-blue)";
+const COLOR_GREEN      = "var(--google-green)";
+const COLOR_YELLOW     = "var(--google-yellow)";
 
 // State variables (Global)
-let timeLeft = FOCUS_TIME;
-let isRunning = false;
-let currentMode = "focus"; // 'focus', 'short-break', 'long-break'
-let timerInterval = null;
+let timeLeft           = FOCUS_TIME;
+let isRunning          = false;
+let currentMode        = "focus"; // 'focus', 'short-break', 'long-break'
+let timerInterval      = null;
 
 
 // ==========================================
 // 2. DOM ELEMENTS (Selecting by ID)
 // ==========================================
 
-const timerDisplay = document.getElementById("timer-display");
-const timerLabel = document.getElementById("timer-label");
-const ringProgress = document.getElementById("ring-progress");
+const timerDisplay  = document.getElementById("timer-display");
+const timerLabel    = document.getElementById("timer-label");
+const ringProgress  = document.getElementById("ring-progress");
+ringProgress.style.strokeDasharray = RING_CIRCUMFERENCE;
+ringProgress.style.strokeDashoffset = RING_CIRCUMFERENCE;
+const iterationCount = document.getElementById("iteration-count");
 
 // Buttons
-const startBtn = document.getElementById("toggle-btn");
-const resetBtn = document.getElementById("reset-btn");
-const toggleIcon = document.getElementById("toggle-icon");
+const startBtn      = document.getElementById("toggle-btn");
+const resetBtn      = document.getElementById("reset-btn");
+const toggleIcon    = document.getElementById("toggle-icon");
 
 // Mode Buttons
-const focusBtn = document.getElementById("focus-btn");
+const focusBtn      = document.getElementById("focus-btn");
 const shortBreakBtn = document.getElementById("short-break-btn");
-const longBreakBtn = document.getElementById("long-break-btn");
+const longBreakBtn  = document.getElementById("long-break-btn");
 
 // Task Elements (POST JAM ACTIVITY)
-const taskList = document.getElementById("task-list");
-const taskInput = document.getElementById("new-task-title");
-const addTaskBtn = document.getElementById("add-task-btn");
-const taskCountNum = document.getElementById("task-count-num");
+const taskList      = document.getElementById("task-list");
+const taskInput     = document.getElementById("new-task-title");
+const addTaskBtn    = document.getElementById("add-task-btn");
+const taskCountNum  = document.getElementById("task-count-num");
 
 
 
@@ -50,26 +56,19 @@ const taskCountNum = document.getElementById("task-count-num");
 // ==========================================
 
 function updateTimerDisplay() {
-  // Calculate minutes and seconds
-  const minutes = Math.floor(timeLeft / 60);
-  const seconds = timeLeft % 60;
+    const minutes = Math.floor(timeLeft / 60);
+    const seconds = timeLeft % 60;
+    timerDisplay.textContent = `${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
 
-  // Format as "MM:SS" (e.g., "05:09")
-  const formattedTime =
-    minutes.toString().padStart(2, "0") +
-    ":" +
-    seconds.toString().padStart(2, "0");
+    let totalTime = currentMode === "focus" ? FOCUS_TIME :
+                    currentMode === "short-break" ? SHORT_BREAK_TIME :
+                    LONG_BREAK_TIME;
 
-  timerDisplay.textContent = formattedTime;
+    const progress = 1 - timeLeft / totalTime;
 
-  // Update the ring progress
-  let totalTime = FOCUS_TIME;
-  if (currentMode === "short-break") totalTime = SHORT_BREAK_TIME;
-  if (currentMode === "long-break") totalTime = LONG_BREAK_TIME;
-
-  const progress = 1 - timeLeft / totalTime;
-  ringProgress.style.strokeDashoffset = progress;
+    ringProgress.style.strokeDashoffset = RING_CIRCUMFERENCE * progress;
 }
+
 
 function startTimer() {
   if (isRunning) {
@@ -87,18 +86,31 @@ function startTimer() {
       currentMode === "focus" ? "Stay focused" : "Take a break";
 
     timerInterval = setInterval(() => {
-      if (timeLeft > 0) {
-        timeLeft = timeLeft - 1;
-        console.log("Timer Running");
-        updateTimerDisplay();
-      } else {
-        // Timer finished
-        clearInterval(timerInterval);
-        isRunning = false;
-        toggleIcon.textContent = "play_arrow";
-        alert("Time is up!");
-        console.log("TImer Finished");
-      }
+        if (timeLeft > 0) {
+            timeLeft = timeLeft - 1;
+            console.log("Timer Running");
+            updateTimerDisplay();
+        }
+        else {
+            clearInterval(timerInterval);
+            isRunning = false;
+
+            toggleIcon.textContent = "play_arrow";
+            if (currentMode === "focus") {
+                iterationCount.textContent =
+                    Number(iterationCount.textContent) + 1;
+            }
+
+            alert("Time is up!");
+            console.log("Timer Finished");
+
+            if (currentMode === "focus") timeLeft = FOCUS_TIME;
+            else if (currentMode === "short-break") timeLeft = SHORT_BREAK_TIME;
+            else if (currentMode === "long-break") timeLeft = LONG_BREAK_TIME;
+
+            updateTimerDisplay();
+        }
+
     }, 1000);
   }
 }
@@ -133,13 +145,15 @@ function setMode(mode) {
     root.style.setProperty("--theme-primary", COLOR_BLUE);
     timerLabel.textContent = "Ready to focus?";
     console.log("Focus Mode");
-  } else if (mode === "short-break") {
+  }
+  else if (mode === "short-break") {
     timeLeft = SHORT_BREAK_TIME;
     shortBreakBtn.classList.add("active");
     root.style.setProperty("--theme-primary", COLOR_GREEN);
     timerLabel.textContent = "Time for a break";
     console.log("Short Break Mode");
-  } else if (mode === "long-break") {
+  }
+  else if (mode === "long-break") {
     timeLeft = LONG_BREAK_TIME;
     longBreakBtn.classList.add("active");
     root.style.setProperty("--theme-primary", COLOR_YELLOW);
@@ -190,10 +204,29 @@ function setMode(mode) {
  * Feel free to add any logic you want!
  */
 function addTask() {
-  // YOUR CODE HERE
-  // ...
-  // ...
-  // ...
+    const inputValue = `${taskInput.value}`.trim();
+    if (inputValue.length > 0) {  
+
+        const emptyState = document.querySelector(".empty-state");
+        if (emptyState) emptyState.remove();
+
+        const li = document.createElement("li");
+        li.className = "task-item";
+        li.innerHTML = `
+                    <span>${inputValue}</span>
+                    <button class="btn-delete">
+                        <span class="material-symbols-rounded">delete</span>
+                    </button>`;
+        taskList.appendChild(li);
+
+        const deleteBtn = li.querySelector(".btn-delete");
+        deleteBtn.addEventListener("click", () => {
+            deleteTask(li);
+        });
+
+        taskInput.value = "";
+        updateTaskCount();
+   }
 }
 
 
@@ -212,10 +245,8 @@ function addTask() {
  * Feel free to add any logic you want!
  */
 function deleteTask(taskElement) {
-  // YOUR CODE HERE
-  // ...
-  // ...
-  // ...
+    taskElement.remove();
+    updateTaskCount();
 }
 
 
@@ -229,10 +260,12 @@ function deleteTask(taskElement) {
  * Feel free to add any logic you want!
  */
 function updateTaskCount() {
-  // YOUR CODE HERE
-  // ...
-  // ...
-  // ...
+  const count = document.querySelectorAll('.task-item').length;
+  if (taskCountNum) taskCountNum.textContent = count;
+
+  if (count === 0) {
+    taskList.innerHTML = `<li class="empty-state">No active tasks</li>`;
+  }
 }
 
 
@@ -262,17 +295,13 @@ longBreakBtn.addEventListener("click", () => {
 });
 
 // Task Controls (POST JAM ACTIVITY)
-// Uncomment these when you're ready to test your functions!
+addTaskBtn.addEventListener("click", addTask);
 
-// addTaskBtn.addEventListener("click", addTask);
-
-// taskInput.addEventListener("keypress", (e) => {
-//   if (e.key === "Enter") {
-//     addTask();
-//   }
-// });
-
-
+taskInput.addEventListener("keypress", (e) => {
+  if (e.key === "Enter") {
+    addTask();
+  }
+});
 
 // ==========================================
 // 6. INITIALIZATION
